@@ -95,7 +95,7 @@ pub fn fund(deps: DepsMut, info: MessageInfo, env: Env, amount: Vec<Coin>) -> Re
         });
     }
 
-    CAMPAIGN.save(deps.storage, &campaign)?; // save the state of campaign
+    CAMPAIGN.save(deps.storage, &mut campaign)?; // save the state of campaign
 
     // check two things
 
