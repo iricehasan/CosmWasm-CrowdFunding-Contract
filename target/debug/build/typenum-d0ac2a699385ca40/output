@@ -1,0 +1,3 @@
+cargo:rerun-if-changed=build/main.rs
+cargo:rustc-env=TYPENUM_BUILD_CONSTS=/Users/macbookpro/cw-course/CosmWasm-CrowdFunding-Contract/target/debug/build/typenum-d0ac2a699385ca40/out/consts.rs
+cargo:rustc-env=TYPENUM_BUILD_OP=/Users/macbookpro/cw-course/CosmWasm-CrowdFunding-Contract/target/debug/build/typenum-d0ac2a699385ca40/out/op.rs
