@@ -7,6 +7,12 @@ pub enum ContractError {
     #[error("{0}")]
     Std(#[from] StdError),
 
+    #[error("Campaign does not exist ({campaign_id:?})")]
+    CampaignDoesNotExist { campaign_id: u64},
+
+    #[error("Campaign already exists ({campaign_id:?})")]
+    CampaignAlreadyExists { campaign_id: u64},
+
     #[error("expired campaign(expiration {expiration:?})")]
     Expired { expiration: Expiration },
 

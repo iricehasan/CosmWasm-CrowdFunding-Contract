@@ -44,33 +44,40 @@ pub fn execute(
 ) -> Result<Response, ContractError> {
     
     match msg {
-        ExecuteMsg::Fund { amount } => fund(deps, info, env, amount),
-        ExecuteMsg::CreateCampaign { goal, expiration, name } => create_campaign(deps, info, goal, expiration, name),
-        ExecuteMsg::Withdraw {} => withdraw(deps, info),
+        ExecuteMsg::Fund { amount, campaign_id } => fund(deps, info, env, amount, campaign_id),
+        ExecuteMsg::CreateCampaign { goal, expiration, campaign_name, campaign_id } => create_campaign(deps, info, goal, expiration, campaign_name, campaign_id),
+        ExecuteMsg::Withdraw { campaign_id } => withdraw(deps, info, campaign_id),
     }
 }
 
 // functions for execute
 
-pub fn create_campaign(deps: DepsMut, info: MessageInfo, goal: Uint128, expiration: Option<Expiration>, name: String) -> Result<Response, ContractError> {
+pub fn create_campaign(deps: DepsMut, info: MessageInfo, goal: Uint128, expiration: Option<Expiration>, campaign_name: String, campaign_id: u64) -> Result<Response, ContractError> {
+
+    // check if campaign exists
+    if (CAMPAIGN.may_load(deps.storage, campaign_id)?).is_some() {
+        // campaign already exists
+        return Err(ContractError::CampaignAlreadyExists { campaign_id: campaign_id })
+    }
 
     // create campaign
     let campaign = Campaign {
+        campaign_id,
         owner: info.sender.clone(),
-        name,
+        campaign_name,
         expiration,
         goal,
         collected: Uint128::zero(),
         funders: Vec::new(),
     };
 
-    CAMPAIGN.save(deps.storage, &campaign)?;
+    CAMPAIGN.save(deps.storage, campaign_id, &campaign)?;
 
     Ok(Response::new().add_attribute("action", "campaign created")
                     .add_attribute("campaign owner", campaign.owner))
 }
 
-pub fn fund(deps: DepsMut, info: MessageInfo, env: Env, amount: Vec<Coin>) -> Result<Response, ContractError> {
+pub fn fund(deps: DepsMut, info: MessageInfo, env: Env, amount: Vec<Coin>, campaign_id: u64) -> Result<Response, ContractError> {
 
     // TO DO
 
@@ -80,7 +87,13 @@ pub fn fund(deps: DepsMut, info: MessageInfo, env: Env, amount: Vec<Coin>) -> Re
 
     // check the sended funds are bigger than a minimum amount and this condition holds
 
-    let mut campaign = CAMPAIGN.load(deps.storage)?; // load the campaign
+    if !(CAMPAIGN.may_load(deps.storage, campaign_id)?.is_some()) {
+        return Err(ContractError::CampaignDoesNotExist { campaign_id: campaign_id }); 
+    }
+
+        // load the campaign
+    let mut campaign = CAMPAIGN.load(deps.storage, campaign_id)?;
+       
 
     let funded = amount.iter().map(|coin| coin.amount).sum();
     campaign.collected += funded;
@@ -95,7 +108,7 @@ pub fn fund(deps: DepsMut, info: MessageInfo, env: Env, amount: Vec<Coin>) -> Re
         });
     }
 
-    CAMPAIGN.save(deps.storage, &mut campaign)?; // save the state of campaign
+    CAMPAIGN.save(deps.storage,campaign_id, &mut campaign)?; // save the state of campaign
 
     // check two things
 
@@ -126,12 +139,20 @@ fn send(to_address: Addr, amount: Vec<Coin>, action: &str) -> Response {
         .add_attribute("to", to_address)
 }
 
-pub fn withdraw(deps: DepsMut, info: MessageInfo) -> Result<Response, ContractError>  {
-    // check the owner so that only the owner can withdraw
+pub fn withdraw(deps: DepsMut, info: MessageInfo, campaign_id: u64) -> Result<Response, ContractError>  {
+    
+    // check if the campaign exists
 
-    let campaign = CAMPAIGN.load(deps.storage)?;
+    if !(CAMPAIGN.may_load(deps.storage, campaign_id)?.is_some()) {
+        return Err(ContractError::CampaignDoesNotExist { campaign_id: campaign_id })
+    }
+
+
+    let campaign = CAMPAIGN.load(deps.storage, campaign_id)?;
     let owner = campaign.owner;
 
+        
+    // check the owner so that only the owner can withdraw
     if info.sender != owner {
         return Err(ContractError::Unauthorized {});
     }
@@ -150,7 +171,7 @@ pub fn withdraw(deps: DepsMut, info: MessageInfo) -> Result<Response, ContractEr
         }]
     });
 
-    CAMPAIGN.remove(deps.storage); // delete the campaing
+    CAMPAIGN.remove(deps.storage, campaign_id); // delete the campaing
 
     res = res.add_attribute("action", "withdraw")
             .add_attribute("to", info.sender.to_string());
@@ -160,5 +181,13 @@ pub fn withdraw(deps: DepsMut, info: MessageInfo) -> Result<Response, ContractEr
 
 #[entry_point]
 pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
-    unimplemented!()
+    match msg {
+        QueryMsg::ViewCampaign { campaign_id } => view_campaign(deps, campaign_id),
+    }
+}
+
+fn view_campaign(deps: Deps, campaign_id: u64) -> StdResult<Binary> {
+    let campaign = CAMPAIGN.load(deps.storage, campaign_id)?;
+
+    to_binary(&campaign)
 }

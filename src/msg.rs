@@ -15,13 +15,15 @@ pub enum ExecuteMsg {
         // expiration date of the campaign
         expiration: Option<Expiration>,
         // name of the campaign
-        name: String,
+        campaign_name: String,
+        // unique id of the campaign
+        campaign_id: u64
     },
-    Fund { amount: Vec<Coin> },
-    Withdraw {},
+    Fund { amount: Vec<Coin>, campaign_id: u64 },
+    Withdraw { campaign_id: u64 },
     // CancelCampaign {},
 }
 
 pub enum QueryMsg {
-    Unimplemented()
+    ViewCampaign { campaign_id: u64 },
 }
